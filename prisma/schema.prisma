@@ -1,0 +1,203 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model user {
+  id String @id @default(uuid())
+  center_id String 
+  username String @unique
+  password String 
+  phone_number String @unique 
+  first_name String
+  last_name String
+  created_at DateTime @default(now())
+  
+  center center @relation(fields: [center_id], references: [id])
+  user_logs user_log[]
+  requests request[]
+  distributions distribution[]
+}
+
+model admin {
+  id String @id @default(uuid())
+  center_id String @unique
+  username String @unique
+  password String 
+  phone_number String @unique 
+  created_at DateTime @default(now())
+
+  center center @relation(fields: [center_id], references: [id])
+  admin_logs admin_log[]
+}
+
+model distributor {
+  id String @id @default(uuid())
+  center_id String
+  first_name String 
+  last_name String 
+  phone_number String @unique 
+  created_at DateTime @default(now())
+
+  center center @relation(fields: [center_id], references: [id])
+  distributions distribution[]
+}
+
+model center {
+  id String @id @default(uuid())
+  name String @unique
+  address String @unique
+  created_at DateTime @default(now())
+
+  admin admin?
+  users user[]
+  distributor distributor[]
+  origin_of blood_bag[] @relation("origin")
+  current_location_of blood_bag[] @relation("current")
+  sent_requests request[] @relation("sender")
+  received_requests request[] @relation("receiver")
+}
+
+model blood_bag {
+  id String @id @default(uuid())
+  origin String 
+  current_location String 
+  phenotype String
+  blood_type Blood_type
+  nature Nature
+  bag_number Int 
+  bag_taken_date DateTime
+  volume Int
+  expiration_date DateTime
+  donor_id String
+  created_at DateTime @default(now())
+
+  origin_center center @relation("origin",fields: [origin], references: [id])
+  current_location_center center @relation("current",fields: [current_location], references: [id])
+  donor donor @relation(fields: [donor_id], references: [id])
+
+  
+  user_logs user_log[]
+  distributed_bags distributed_bag[]
+
+  @@unique([origin, bag_number])
+}
+
+model donor {
+  id String @id @default(uuid())
+  first_name String
+  last_name String
+  phone_number String @unique
+  created_at DateTime @default(now())
+
+  blood_bags blood_bag[]
+}
+
+model request{
+  id String @id @default(uuid())
+  sender_id String
+  receiver_id String
+  status Status
+  volume Int
+  user_id String
+  number_of_bags Int
+  blood_type Blood_type
+  nature Nature
+  reason_for_disapproval String?
+  created_at DateTime @default(now())
+
+  user user @relation(fields: [user_id], references: [id])
+  center_sender center @relation("sender",fields: [sender_id], references: [id])
+  center_receiver center @relation("receiver",fields: [receiver_id], references: [id])
+  distribution distribution?
+}
+
+model distribution {
+  id String @id @default(uuid())
+  request_id String @unique
+  user_id String
+  distributor_id String
+  created_at DateTime @default(now())
+
+  request request @relation(fields: [request_id], references: [id])
+  user user @relation(fields: [user_id], references: [id])
+  distributor distributor @relation(fields: [distributor_id], references: [id])
+
+  bags distributed_bag[]
+}
+
+model distributed_bag {
+  distribution_id String
+  bag_id String
+
+  distribution distribution @relation(fields: [distribution_id], references: [id])
+  blood_bag blood_bag @relation(fields: [bag_id], references: [id])
+
+  @@unique([distribution_id, bag_id])
+}
+
+model admin_log {
+  id String @id @default(uuid())
+  admin_id String
+  action_type Action_type
+  target_type Target
+  target_id String
+  created_at DateTime @default(now())
+
+  admin admin @relation(fields: [admin_id], references: [id])
+}
+
+model user_log {
+  id String @id @default(uuid())
+  user_id String
+  bag_id String
+  action_type Action_type
+  reason String?
+  created_at DateTime @default(now())
+
+  user user @relation(fields: [user_id], references: [id])
+  blood_bag blood_bag @relation(fields: [bag_id], references: [id])
+}
+
+enum Blood_type {
+  A_positive
+  A_negative
+  B_positive
+  B_negative
+  AB_positive
+  AB_negative
+  O_positive
+  O_negative
+}
+enum Nature {
+  Plaquette
+  CGR
+  PFC
+}
+enum Status {
+  pending
+  approved
+  denied
+}
+enum Action_type {
+  create
+  edit
+  delete
+}
+
+enum Target {
+  user
+  distributor
+}
